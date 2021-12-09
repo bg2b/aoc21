@@ -1,0 +1,7 @@
+code.txt
+*~
+\#*\#
+*.o
+doit*
+!doit*.*
+doit*.*~
