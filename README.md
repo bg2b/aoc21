@@ -19,5 +19,7 @@ Sometimes I might go back and revisit a problem in a different
 (usually more efficient) way.  `doit2a.cc` would be an alternative to
 `doit2.cc`.
 
-A couple of days use Matlab or maybe a shell script.
+Day 4 uses a shell script, `play1.sh` and `play2.sh` for the two
+parts.
+
 Occasionally there's only one program used for both parts.
