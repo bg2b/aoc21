@@ -61,7 +61,7 @@ pair<unsigned, int> board::play(vector<int> const &numbers) {
     if (score)
       return make_pair(i, score);
   }
-  return make_pair(numbers.size(), 0);
+  return make_pair(0, 0);
 }
 
 int main(int argc, char **argv) {
@@ -72,13 +72,13 @@ int main(int argc, char **argv) {
   int num;
   while (cnums >> num)
     numbers.push_back(num);
-  unsigned first_winner = numbers.size();
+  unsigned last_winner = 0;
   int winner_score = 0;
   while (getline(cin, line) && cin.peek() != EOF) {
     assert(line == "");
     auto this_card = board(cin).play(numbers);
-    if (this_card.first < first_winner) {
-      first_winner = this_card.first;
+    if (this_card.first > last_winner) {
+      last_winner = this_card.first;
       winner_score = this_card.second;
     }
   }
