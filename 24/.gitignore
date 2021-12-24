@@ -1,0 +1,4 @@
+compile
+checker
+checker.cc
+alu1.cc
