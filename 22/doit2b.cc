@@ -44,6 +44,18 @@ bdd::bdd(unsigned index_, BDD const &f0, BDD const &f1) :
 
 map<tuple<unsigned, unsigned, unsigned>, wBDD> unique_bdds;
 
+void bdd_gc() {
+  static size_t gc_threadhold = 10000;
+  if (unique_bdds.size() > gc_threadhold) {
+    for (auto i = unique_bdds.begin(); i != unique_bdds.end(); ) {
+      auto p = i++;
+      if (p->second.expired())
+	unique_bdds.erase(p);
+    }
+    gc_threadhold = max(2 * unique_bdds.size(), size_t(10000));
+  }
+}
+
 // Find (or make) a BDD for "if var_index then f0 else f1"; index
 // should be less than f0->index and f1->index
 BDD bdd_find(unsigned index, BDD const &f0, BDD const &f1) {
@@ -279,6 +291,7 @@ int main(int argc, char **argv) {
 	     bdd_satfrac(reactor) * (1ul << (3 * num_bits)),
 	     bdd_size(reactor));
     i = j;
+    bdd_gc();
   }
   printf("BDD size %zu, total set %.16g\n",
 	 bdd_size(reactor),
