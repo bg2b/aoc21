@@ -1,0 +1,21 @@
+Solution file, description; notes
+
+doit2.cc, explicit cube cutting;
+This seems generally the fastest.  Technically there's a quadratic
+with testing each new cube against whatever's currently.  But the
+non-overlap test is fast, and it can prune away cubes so it tends not
+to get out of control
+
+doit2a.cc, signed overlap representation;
+This is clever and pretty fast on the AOC input, but falls apart on
+bigger examples.  Keeping overlaps around bogs things down.
+
+doit2b.cc, BDD (Binary Decision Diagram) approach;
+Fairly quick.  Slower than doit2a.cc on the AOC input, but does better
+on bigger things.  Might be competitive with doit2.cc with a real BDD
+library.
+
+doit2c.cc, collects splitting points for each axis, uses a bit set;
+This is a slightly smarter generalization of the naive approach.
+Works better than I expected, similar to doit2a.cc.  Might be good on
+certain types of inputs.
