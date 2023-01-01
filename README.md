@@ -20,3 +20,5 @@ Sometimes I might go back and revisit a problem in a different
 `doit2.cc`.
 
 Occasionally there's only one program used for both parts.
+
+![Advent calendar for 2021](advent.png)
