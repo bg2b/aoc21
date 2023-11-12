@@ -13,7 +13,8 @@ Input is on stdin, output is printed to stdout.
 
 Input has sometimes been pre-processed for ease of reading.
 Example input if any is called `input1`.
-The real input is `input`.
+The real input is `input` (note, my inputs are no longer included in
+the repository).
 
 Sometimes I might go back and revisit a problem in a different
 (usually more efficient) way.  `doit2a.cc` would be an alternative to
