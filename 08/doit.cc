@@ -6,17 +6,15 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <vector>
+#include <map>
 #include <algorithm>
 #include <array>
-#include <bit>
-#include <cstdint>
 #include <cassert>
 
 using namespace std;
 
-// Part 2 here uses a hand-rolled set of deductions to find the
-// correct wiring permutation
+// Part 2 here is just a brute-force search through all wiring
+// permutations
 
 // How the digits are displayed (assuming no mixed up segments):
 //
@@ -37,6 +35,11 @@ using namespace std;
 // .    f  e    f  .    f  e    f  .    f
 // .    f  e    f  .    f  e    f  .    f
 //  gggg    gggg    ....    gggg    gggg
+
+// Lit segments for all the digits above
+map<string, int> digits = {
+    {"abcefg", 0}, {"cf", 1},     {"acdeg", 2}, {"acdfg", 3},   {"bcdf", 4},
+    {"abdfg", 5},  {"abdefg", 6}, {"acf", 7},   {"abcdefg", 8}, {"abcdfg", 9}};
 
 struct display {
   // The observed patterns
@@ -81,64 +84,33 @@ int display::count1478() const {
 }
 
 int display::decode() const {
-  using byte = uint8_t;
-  // Convert a pattern to a byte
-  auto numeric = [&](string const &pattern) {
-    byte result = 0;
-    for (auto c : pattern)
-      result |= 1 << (c - 'a');
+  string wiring("abcdefg");
+  // Apply the wiring permutation to a pattern of segments,
+  // returning the (sorted) segments that result
+  auto decode1 = [&](string const &pattern) {
+    string result(pattern);
+    for (auto &c : result)
+      c = wiring[c - 'a'];
+    sort(result.begin(), result.end());
     return result;
   };
-  // Get the bytes for patterns of a given size
-  auto of_length = [&](size_t n) {
-    vector<byte> result;
+  // Are all observed patterns valid under the wiring permutation?
+  auto valid = [&]() {
     for (auto const &pattern : patterns)
-      if (pattern.size() == n)
-        result.push_back(numeric(pattern));
-    return result;
+      if (!digits.contains(decode1(pattern)))
+        return false;
+    return true;
   };
-  // Get the unique pattern of the given size
-  auto unique_of_length = [&](size_t n) {
-    auto v = of_length(n);
-    assert(v.size() == 1);
-    return v.front();
+  // Try all permutations of the wires
+  while (!valid()) {
+    bool has_next = next_permutation(wiring.begin(), wiring.end());
+    assert(has_next);
+  }
+  auto decode_digit = [&](string const &pattern) {
+    return digits.at(decode1(pattern));
   };
-  // Find all the digit patterns...
-  array<byte, 10> digits{0};
-  // Find the easily-deducible digits
-  digits[1] = unique_of_length(2);
-  digits[4] = unique_of_length(4);
-  digits[7] = unique_of_length(3);
-  digits[8] = unique_of_length(7);
-  // Find 0, 6, 9
-  auto v069 = of_length(6);
-  assert(v069.size() == 3);
-  for (auto v : v069)
-    if (popcount(byte(v & ~(digits[4] | digits[7]))) == 1)
-      digits[9] = v;
-    else if (popcount(byte(v & digits[1])) == 1)
-      digits[6] = v;
-    else
-      digits[0] = v;
-  // Find 2, 3, 5
-  auto v235 = of_length(5);
-  assert(v235.size() == 3);
-  for (auto v : v235)
-    if (popcount(byte(v & digits[1])) == 2)
-      digits[3] = v;
-    else if (popcount(byte(v & digits[4])) == 3)
-      digits[5] = v;
-    else
-      digits[2] = v;
-  // Convert output
-  auto to_digit = [&](string const &pattern) {
-    byte b = numeric(pattern);
-    auto p = find(digits.begin(), digits.end(), b);
-    assert(p != digits.end());
-    return p - digits.begin();
-  };
-  return to_digit(output[0]) * 1000 + to_digit(output[1]) * 100 +
-         to_digit(output[2]) * 10 + to_digit(output[3]) * 1;
+  return decode_digit(output[0]) * 1000 + decode_digit(output[1]) * 100 +
+         decode_digit(output[2]) * 10 + decode_digit(output[3]) * 1;
 }
 
 void solve(int (display::*fn)() const) {
