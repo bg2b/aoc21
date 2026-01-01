@@ -1,10 +1,14 @@
+// -*- C++ -*-
+// g++ -std=c++20 -Wall -g -o doit doit.cc
+// ./doit 1 < input  # part 1
+// ./doit 2 < input  # part 2
+
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
 #include <numeric>
-#include <stdio.h>
-#include <assert.h>
+#include <cassert>
 
 using namespace std;
 
@@ -12,7 +16,8 @@ struct transmission {
   vector<bool> bits;
   unsigned read_pos{0};
 
-  transmission(string const &BITS);
+  // Read from cin
+  transmission();
 
   // Get the next bit, advance read_pos
   bool read_bit();
@@ -21,7 +26,9 @@ struct transmission {
   size_t read_bits(unsigned num_bits);
 };
 
-transmission::transmission(string const &BITS) {
+transmission::transmission() {
+  string BITS;
+  cin >> BITS;
   for (auto c : BITS) {
     if (c >= '0' && c <= '9')
       c -= '0';
@@ -58,12 +65,16 @@ struct packet {
   size_t literal{0};
   vector<packet> subpackets;
 
+  // Construct from the incoming transmission
   packet(transmission &xmission);
   // Used by constructor for reading a literal
   void read_literal(transmission &xmission);
   // Used by constructor for reading an operator
   void read_operator(transmission &xmission);
 
+  // For part 1
+  unsigned version_sum() const;
+  // For part 2
   size_t eval() const;
 };
 
@@ -77,7 +88,7 @@ packet::packet(transmission &xmission) {
 }
 
 void packet::read_literal(transmission &xmission) {
-  for (bool has_next_nybble = true; has_next_nybble; ) {
+  for (bool has_next_nybble = true; has_next_nybble;) {
     unsigned nybble = xmission.read_bits(5);
     has_next_nybble = (nybble & 0x10) != 0;
     literal <<= 4;
@@ -101,6 +112,13 @@ void packet::read_operator(transmission &xmission) {
   }
 }
 
+unsigned packet::version_sum() const {
+  unsigned result = version;
+  for (auto const &subpacket : subpackets)
+    result += subpacket.version_sum();
+  return result;
+}
+
 size_t packet::eval() const {
   vector<size_t> args;
   for (auto const &subpacket : subpackets)
@@ -109,8 +127,8 @@ size_t packet::eval() const {
   case 0:
     return accumulate(args.begin(), args.end(), size_t(0));
   case 1:
-    return accumulate(args.begin(), args.end(),
-		      size_t(1), multiplies<size_t>());
+    return accumulate(args.begin(), args.end(), size_t(1),
+                      multiplies<size_t>());
   case 2:
     assert(!args.empty());
     return *min_element(args.begin(), args.end());
@@ -132,10 +150,24 @@ size_t packet::eval() const {
   }
 }
 
+void part1() {
+  transmission xmission;
+  cout << packet(xmission).version_sum() << '\n';
+}
+
+void part2() {
+  transmission xmission;
+  cout << packet(xmission).eval() << '\n';
+}
+
 int main(int argc, char **argv) {
-  string line;
-  getline(cin, line);
-  transmission xmission(line);
-  printf("Packet value %zu\n", packet(xmission).eval());
+  if (argc != 2) {
+    cerr << "usage: " << argv[0] << " partnum < input\n";
+    exit(1);
+  }
+  if (*argv[1] == '1')
+    part1();
+  else
+    part2();
   return 0;
 }
