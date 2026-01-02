@@ -1,9 +1,12 @@
+// -*- C++ -*-
+// g++ -std=c++20 -Wall -g -o doit doit.cc
+// ./doit 1 < input  # part 1
+// ./doit 2 < input  # part 2
+
 #include <iostream>
 #include <string>
 #include <vector>
-#include <list>
-#include <stdio.h>
-#include <assert.h>
+#include <cassert>
 
 using namespace std;
 
@@ -13,7 +16,8 @@ struct cucumbers {
   int H() const { return sea_floor.size(); }
   int W() const { return sea_floor[0].size(); }
 
-  cucumbers(istream &in);
+  // Construct from cin
+  cucumbers();
 
   // Wrap coordinates beyond H() or W()
   void maybe_wrap(int &i, int &j) const;
@@ -27,13 +31,11 @@ struct cucumbers {
 
   // Note | not ||
   bool step() { return step('>') | step('v'); }
-
-  void print() const;
 };
 
-cucumbers::cucumbers(istream &in) {
+cucumbers::cucumbers() {
   string line;
-  while (getline(in, line)) {
+  while (getline(cin, line)) {
     sea_floor.push_back(line);
     assert(sea_floor.back().size() == sea_floor.front().size());
   }
@@ -52,16 +54,14 @@ bool cucumbers::is_empty(int i, int j) const {
 }
 
 bool cucumbers::step(char type) {
-  int delta_i = (type == 'v' ? +1 : 0);
-  int delta_j = (type == '>' ? +1 : 0);
-  list<pair<int, int>> moving;
+  int delta_i = type == 'v' ? +1 : 0;
+  int delta_j = type == '>' ? +1 : 0;
+  vector<pair<int, int>> moving;
   for (int i = 0; i < H(); ++i)
     for (int j = 0; j < W(); ++j)
       if (sea_floor[i][j] == type && is_empty(i + delta_i, j + delta_j))
-	moving.emplace_back(i, j);
-  for (auto const &p : moving) {
-    int i = p.first;
-    int j = p.second;
+        moving.emplace_back(i, j);
+  for (auto [i, j] : moving) {
     sea_floor[i][j] = '.';
     i += delta_i;
     j += delta_j;
@@ -71,21 +71,24 @@ bool cucumbers::step(char type) {
   return !moving.empty();
 }
 
-void cucumbers::print() const {
-  for (auto const &row : sea_floor)
-    printf(" %s\n", row.c_str());
-  printf("\n");
-}
-
-int main(int argc, char **argv) {
-  cucumbers cucs(cin);
+void part1() {
+  cucumbers cucs;
   int steps = 1;
-  if (argc > 1)
-    cucs.print();
   while (cucs.step())
     ++steps;
-  if (argc > 1)
-    cucs.print();
-  printf("%d steps\n", steps);
+  cout << steps << '\n';
+}
+
+void part2() { cout << "Remotely Start The Sleigh!\n"; }
+
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    cerr << "usage: " << argv[0] << " partnum < input\n";
+    exit(1);
+  }
+  if (*argv[1] == '1')
+    part1();
+  else
+    part2();
   return 0;
 }
