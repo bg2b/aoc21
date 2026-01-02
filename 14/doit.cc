@@ -79,7 +79,7 @@ polymer::polymer(string const &tmplt) {
 polymer polymer::grow(polymerization const &poly_rules) const {
   // Start from the same initial element
   polymer result(start);
-  for (auto const &[adj, num_times] : adjacent_counts) {
+  for (auto const &[adj, num_times] : adjacent_counts)
     if (auto ins = poly_rules.insertion(adj); ins) {
       // An insertion splits (element1, element2) into two pairs
       result.add_pair({adj.first, *ins}, num_times);
@@ -87,7 +87,6 @@ polymer polymer::grow(polymerization const &poly_rules) const {
     } else
       // Nothing inserts between the pair
       result.add_pair(adj, num_times);
-  }
   return result;
 }
 
