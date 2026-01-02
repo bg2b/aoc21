@@ -1,18 +1,26 @@
+// -*- C++ -*-
+// g++ -std=c++20 -Wall -g -o doit doit.cc
+// ./doit 1 < input  # part 1
+// ./doit 2 < input  # part 2
+
 #include <iostream>
 #include <string>
 #include <vector>
-#include <stdio.h>
-#include <assert.h>
+#include <cassert>
 
 using namespace std;
 
+// The image enhancement algorithm
 string algorithm;
 
 struct image {
+  // The infinite outside set of pixels has this value
   char outside{'.'};
+  // The non-infinite portion
   vector<string> pixels;
 
-  image(istream &in);
+  // Read from cin
+  image();
 
   int H() const { return pixels.size(); }
   int W() const { return pixels[0].size(); }
@@ -23,23 +31,22 @@ struct image {
   char enhanced_pixel(int i, int j) const;
 
   // Said in loud voice to computer
-  void Enhance(bool excited);
+  void Enhance();
 
+  // How many pixels are lit?
   int num_lit() const;
 };
 
-image::image(istream &in) {
+image::image() {
   string line;
-  while (getline(in, line)) {
+  while (getline(cin, line)) {
     pixels.push_back(line);
     assert(pixels.back().size() == pixels.front().size());
   }
 }
 
 char image::at(int i, int j) const {
-  if (i < 0 || i >= H())
-    return outside;
-  if (j < 0 || j >= W())
+  if (i < 0 || i >= H() || j < 0 || j >= W())
     return outside;
   return pixels[i][j];
 }
@@ -51,13 +58,13 @@ char image::enhanced_pixel(int i, int j) const {
     for (int dj = -1; dj <= 1; ++dj) {
       index *= 2;
       if (at(i + di, j + dj) != '.')
-	++index;
+        ++index;
     }
   assert(index < algorithm.size());
   return algorithm[index];
 }
 
-void image::Enhance(bool) {
+void image::Enhance() {
   // How does the outside transform?
   char new_outside = enhanced_pixel(-10, -10);
   // Transform the explicit part
@@ -80,19 +87,34 @@ int image::num_lit() const {
   for (int i = 0; i < H(); ++i)
     for (int j = 0; j < W(); ++j)
       if (at(i, j) != '.')
-	++result;
+        ++result;
   return result;
 }
 
-int main(int argc, char **argv) {
+void solve(bool part1) {
   getline(cin, algorithm);
   assert(algorithm.size() == 512);
   string blank;
   getline(cin, blank);
   assert(blank.empty());
-  image img(cin);
-  for (int i = 0; i < 50; ++i)
-    img.Enhance(!!1);
-  printf("%d lit pixels\n", img.num_lit());
+  image img;
+  int iterations = part1 ? 2 : 50;
+  for (int _ = 0; _ < iterations; ++_)
+    img.Enhance();
+  cout << img.num_lit() << '\n';
+}
+
+void part1() { solve(true); }
+void part2() { solve(false); }
+
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    cerr << "usage: " << argv[0] << " partnum < input\n";
+    exit(1);
+  }
+  if (*argv[1] == '1')
+    part1();
+  else
+    part2();
   return 0;
 }
