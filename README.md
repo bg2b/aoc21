@@ -4,25 +4,25 @@ Info and problems are available at https://adventofcode.com/2021
 
 ## Overview
 
-Each day's problem input and solution is in a subdirectory, `01`, `02`, etc.
+Each day's solutions are in a subdirectory, `01`, `02`, etc.
 
-Solutions are mostly C++: problem 1 is `doit1.cc`, problem 2 is `doit2.cc`.
-Compile with
+Solutions are C++.  Compile with:
 ```
-g++ -Wall -g -o doit1 doit1.cc
+g++ -std=c++20 -Wall -g -o doit doit.cc
 ```
-Input is on stdin, output is printed to stdout.
+There are occasional problems that need something special; in that
+case a comment at the start of the file will say what to do.
 
-Input has sometimes been pre-processed for ease of reading.
-Example input if any is called `input1`.
-The real input is `input` (note, my inputs are no longer included in
-the repository).
+Example inputs, if any, are called `input1`, `input2`, etc.
+The real input, as downloaded from the AOC website, would be called
+`input`, though my inputs are not included in the repository.
+
+Input is on stdin, output is printed to stdout.  Run part 1 as `./doit
+1 < input` and part 2 as `./doit 2 < input`
 
 Sometimes I might go back and revisit a problem in a different
-(usually more efficient) way.  `doit2a.cc` would be an alternative to
-`doit2.cc`.
-
-Occasionally there's only one program used for both parts.
+(usually more efficient) way.  Alternatives will be other `.cc` files
+starting with `doit`.
 
 ## Recommended problems
 
