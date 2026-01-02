@@ -1,7 +1,11 @@
+// -*- C++ -*-
+// g++ -std=c++20 -Wall -g -o doit doit.cc
+// ./doit 1 < input  # part 1
+// ./doit 2 < input  # part 2
+
 #include <iostream>
 #include <list>
-#include <stdio.h>
-#include <assert.h>
+#include <cassert>
 
 using namespace std;
 
@@ -11,7 +15,9 @@ struct cube {
   int l[dim];
   int h[dim];
 
-  cube(istream &in);
+  // Construct from cin
+  cube();
+  // Cube covering +/-max_coord in all dimensions
   cube(int max_coord);
 
   // Do two cubes overlap?
@@ -29,14 +35,16 @@ struct cube {
   size_t volume() const;
 };
 
-cube::cube(istream &in) {
+cube::cube() {
   for (int i = 0; i < dim; ++i) {
-    in >> l[i];
-    in >> h[i];
-    assert(l[i] <= h[i]);
+    char axis, equals, dot;
+    cin >> axis >> equals >> l[i] >> dot >> dot >> h[i];
+    if (i < dim - 1) {
+      char comma;
+      cin >> comma;
+    }
+    assert(axis == 'x' + i && l[i] <= h[i]);
   }
-  char eol = in.get();
-  assert(eol == '\n');
 }
 
 cube::cube(int max_coord) {
@@ -95,19 +103,22 @@ size_t cube::volume() const {
   return result;
 }
 
-int main(int argc, char **argv) {
+void solve(bool part1) {
   list<cube> cubes;
   string cmd;
   while (cin >> cmd) {
     assert(cmd == "on" || cmd == "off");
-    cube c(cin);
+    cube c;
+    // Part 1 only considers cubes overlapping the [-50,50] range
+    if (part1 && !c.overlaps(cube(50)))
+      continue;
     list<cube> minus_c;
     for (auto const &existing : cubes)
       if (existing.overlaps(c)) {
-	auto diff = existing.subtract(c);
-	minus_c.insert(minus_c.end(), diff.begin(), diff.end());
+        auto diff = existing.subtract(c);
+        minus_c.insert(minus_c.end(), diff.begin(), diff.end());
       } else
-	minus_c.push_back(existing);
+        minus_c.push_back(existing);
     cubes = minus_c;
     if (cmd == "on")
       cubes.push_back(c);
@@ -115,6 +126,20 @@ int main(int argc, char **argv) {
   size_t total_set = 0;
   for (auto const &c : cubes)
     total_set += c.volume();
-  printf("%zu cubes, total set %zu\n", cubes.size(), total_set);
+  cout << total_set << '\n';
+}
+
+void part1() { solve(true); }
+void part2() { solve(false); }
+
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    cerr << "usage: " << argv[0] << " partnum < input\n";
+    exit(1);
+  }
+  if (*argv[1] == '1')
+    part1();
+  else
+    part2();
   return 0;
 }

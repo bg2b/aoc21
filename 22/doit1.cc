@@ -1,7 +1,26 @@
+// -*- C++ -*-
+// g++ -std=c++20 -Wall -g -o doit1 doit1.cc
+// ./doit1 1 < input  # part 1
+// ./doit1 2 < input  # part 2
+
+// Alternative using inclusion-exclusion.  The idea is to keep a map
+// of cube => int where cubes are allowed to be added or subtracted.
+// When doing an op with a new cube, find the intersection with all
+// the cubes in the map.  For each such intersection, subtract the
+// value for the existing cube (basically cancel out the overlap
+// portion).  Then if turning on the new cube, add 1 to that region in
+// the map.  See the argument in solve() for more details.
+//
+// The main benefit of this is that cube intersection is easy, while
+// the regular cube slicing is more finicky.  The drawback is that the
+// representation is generally not so compact.  It's actually similar
+// speed or maybe slightly faster on the actual input, but I tried
+// some larger examples with more overlap, and eventually it bogs
+// down.
+
 #include <iostream>
-#include <list>
-#include <stdio.h>
-#include <assert.h>
+#include <map>
+#include <cassert>
 
 using namespace std;
 
@@ -11,32 +30,30 @@ struct cube {
   int l[dim];
   int h[dim];
 
-  cube(istream &in);
+  // Construct from cin
+  cube();
+  // Cube covering +/-max_coord in all dimensions
   cube(int max_coord);
 
   // Do two cubes overlap?
   bool overlaps(cube const &c) const;
 
-  // Cut a cube along dimension i at position split (between l[i] and
-  // h[i])
-  cube low_part(int i, int split) const;
-  cube high_part(int i, int split) const;
-
-  // Return a disjoint list of cubes that make up whatever's outside
-  // the overlapping cube c
-  list<cube> subtract(cube const &c) const;
+  // Return the intersection of two cubes
+  cube intersection(cube const &c) const;
 
   size_t volume() const;
 };
 
-cube::cube(istream &in) {
+cube::cube() {
   for (int i = 0; i < dim; ++i) {
-    in >> l[i];
-    in >> h[i];
-    assert(l[i] <= h[i]);
+    char axis, equals, dot;
+    cin >> axis >> equals >> l[i] >> dot >> dot >> h[i];
+    if (i < dim - 1) {
+      char comma;
+      cin >> comma;
+    }
+    assert(axis == 'x' + i && l[i] <= h[i]);
   }
-  char eol = in.get();
-  assert(eol == '\n');
 }
 
 cube::cube(int max_coord) {
@@ -53,38 +70,13 @@ bool cube::overlaps(cube const &c) const {
   return true;
 }
 
-cube cube::low_part(int i, int split) const {
-  assert(l[i] <= split);
-  cube result(*this);
-  result.h[i] = split;
-  return result;
-}
-
-cube cube::high_part(int i, int split) const {
-  assert(split <= h[i]);
-  cube result(*this);
-  result.l[i] = split;
-  return result;
-}
-
-list<cube> cube::subtract(cube const &c) const {
+cube cube::intersection(cube const &c) const {
   assert(overlaps(c));
-  list<cube> result;
-  cube remainder(*this);
+  cube result(*this);
   for (int i = 0; i < dim; ++i) {
-    // You are lost in a maze of twisty little <, =, >, l, h, all
-    // different
-    assert(remainder.h[i] >= c.l[i] && remainder.l[i] <= c.h[i]);
-    if (remainder.l[i] < c.l[i]) {
-      result.push_back(remainder.low_part(i, c.l[i] - 1));
-      remainder = remainder.high_part(i, c.l[i]);
-    }
-    if (remainder.h[i] > c.h[i]) {
-      result.push_back(remainder.high_part(i, c.h[i] + 1));
-      remainder = remainder.low_part(i, c.h[i]);
-    }
+    result.l[i] = max(result.l[i], c.l[i]);
+    result.h[i] = min(result.h[i], c.h[i]);
   }
-  assert(result.size() <= 2 * dim);
   return result;
 }
 
@@ -95,28 +87,75 @@ size_t cube::volume() const {
   return result;
 }
 
-int main(int argc, char **argv) {
-  list<cube> cubes;
+// Some total order
+bool operator<(cube const &c1, cube const &c2) {
+  for (int i = 0; i < dim; ++i) {
+    if (c1.l[i] != c2.l[i])
+      return c1.l[i] < c2.l[i];
+    if (c1.h[i] != c2.h[i])
+      return c1.h[i] < c2.h[i];
+  }
+  // Equal
+  return false;
+}
+
+void solve(bool part1) {
+  // Map from cube to number of times points in the cube appear (can
+  // be negative for subtracting overlaps)
+  map<cube, int> cubes;
   string cmd;
   while (cin >> cmd) {
     assert(cmd == "on" || cmd == "off");
-    cube c(cin);
-    if (!c.overlaps(cube(50)))
+    cube c;
+    // Part 1 only considers cubes overlapping the [-50,50] range
+    if (part1 && !c.overlaps(cube(50)))
       continue;
-    list<cube> minus_c;
+    map<cube, int> updates;
     for (auto const &existing : cubes)
-      if (existing.overlaps(c)) {
-	auto diff = existing.subtract(c);
-	minus_c.insert(minus_c.end(), diff.begin(), diff.end());
-      } else
-	minus_c.push_back(existing);
-    cubes = minus_c;
+      if (existing.first.overlaps(c)) {
+        // Subtle... why does this work?  Consider some point that's
+        // within the cube c.  Assume by induction that the sum of
+        // existing cube * count for cubes containing the point is
+        // either 1 or 0, depending on whether the point is on or not.
+        //
+        // 1. Suppose the point is on already.  The sum of existing
+        //    counts is +1 by the induction hypothesis.  The negation
+        //    here will then produce a -1.  That'll cancel the
+        //    existing 1 to give 0.
+        //
+        // 2. Suppose the point is currently off.  The existing sum is
+        //    0, so the negation won't produce a net change, and it'll
+        //    stay 0.
+        //
+        // In both cases, the count of any point in c will be 0 after
+        // this loop.  If the command is "off", that's the right
+        // answer, and if the command is "on" then ++new_cubes[c] will
+        // give 1.  QED
+        cube overlap = existing.first.intersection(c);
+        updates[overlap] -= existing.second;
+      }
     if (cmd == "on")
-      cubes.push_back(c);
+      ++updates[c];
+    for (auto const &[c, amount] : updates)
+      cubes[c] += amount;
   }
-  size_t total_set = 0;
+  ssize_t total_set = 0;
   for (auto const &c : cubes)
-    total_set += c.volume();
-  printf("%zu cubes, total set %zu\n", cubes.size(), total_set);
+    total_set += c.first.volume() * c.second;
+  cout << total_set << '\n';
+}
+
+void part1() { solve(true); }
+void part2() { solve(false); }
+
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    cerr << "usage: " << argv[0] << " partnum < input\n";
+    exit(1);
+  }
+  if (*argv[1] == '1')
+    part1();
+  else
+    part2();
   return 0;
 }
