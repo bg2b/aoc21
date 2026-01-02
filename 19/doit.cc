@@ -1,10 +1,15 @@
+// -*- C++ -*-
+// g++ -std=c++20 -Wall -g -o doit doit.cc
+// ./doit 1 < input  # part 1
+// ./doit 2 < input  # part 2
+
 #include <iostream>
 #include <sstream>
 #include <array>
 #include <list>
-#include <set>
-#include <stdio.h>
-#include <assert.h>
+#include <unordered_map>
+#include <unordered_set>
+#include <cassert>
 
 using namespace std;
 
@@ -67,22 +72,36 @@ displacement operator-(displacement const &d1, displacement const &d2) {
   return displacement(new_xyz);
 }
 
-// Lexicographic ordering
-bool operator<(displacement const &d1, displacement const &d2) {
-  for (int i : { 0, 1, 2 }) {
-    if (d1.xyz[i] < d2.xyz[i])
-      return true;
-    if (d2.xyz[i] < d1.xyz[i])
-      return false;
+// set/map operations are a big part of the time, so I'll take the
+// trouble to use the unordered versions
+template <> struct std::hash<displacement> {
+  size_t operator()(displacement const &d) const {
+    return d.xyz[0] + 1000 * (d.xyz[1] + 1000 * d.xyz[2]);
   }
-  // Equal
-  return false;
+};
+
+bool operator==(displacement const &d1, displacement const &d2) {
+  return d1.xyz == d2.xyz;
 }
 
-struct region {
-  set<displacement> sensed;
+bool operator<(displacement const &d1, displacement const &d2) {
+  return d1.xyz < d2.xyz;
+}
 
-  region(istream &in);
+int manhattan(displacement const &d1, displacement const &d2) {
+  auto d = d2 - d1;
+  return abs(d.xyz[0]) + abs(d.xyz[1]) + abs(d.xyz[2]);
+}
+
+// A region with some scanners and the beacons that they are sensing
+struct region {
+  // The sensed beacons
+  unordered_set<displacement> sensed;
+  // The scanners
+  list<displacement> scanners;
+
+  // Construct from cin
+  region();
   // Copy with a new orientation
   region(region const &r, int orient);
   // Copy while shifting
@@ -90,7 +109,7 @@ struct region {
 
   // Pairwise offsets of items in sensed.  Used for a quick test of
   // whether there can be sufficient overlap between regions
-  multiset<displacement> signature() const;
+  unordered_map<displacement, int> signature() const;
 
   // Try to merge r into the region.  Flips r through all possible
   // orientations, and for each orientation tries to shift it to one
@@ -100,44 +119,51 @@ struct region {
   bool merge(region const &r);
 };
 
-region::region(istream &in) {
+region::region() {
   string line;
-  while (getline(in, line) && line != "") {
+  while (getline(cin, line) && !line.empty()) {
     array<int, 3> xyz;
-    stringstream(line) >> xyz[0] >> xyz[1] >> xyz[2];
+    char comma;
+    stringstream(line) >> xyz[0] >> comma >> xyz[1] >> comma >> xyz[2];
+    assert(comma == ',');
     sensed.emplace(displacement(xyz));
   }
+  // There's a single scanner at the origin
+  scanners.emplace_back(displacement({0, 0, 0}));
 }
 
 region::region(region const &r, int orient) {
   for (auto const &d : r.sensed)
     sensed.emplace(displacement(d, orient));
+  for (auto const &d : r.scanners)
+    scanners.emplace_back(displacement(d, orient));
 }
 
 region::region(region const &r, displacement const &shift) {
   for (auto const &d : r.sensed)
     sensed.emplace(d + shift);
+  for (auto const &d : r.scanners)
+    scanners.emplace_back(d + shift);
 }
 
-multiset<displacement> region::signature() const {
-  multiset<displacement> result;
+unordered_map<displacement, int> region::signature() const {
+  unordered_map<displacement, int> result;
   for (auto const &d1 : sensed)
     for (auto const &d2 : sensed)
       // Only need one of (d1, d2) and (d2, d1), so use lexicographic
       // order
       if (d1 < d2)
-	result.emplace(d2 - d1);
+        ++result[d2 - d1];
   return result;
 }
 
-bool insufficient_overlap(multiset<displacement> const &sig1,
-			  multiset<displacement> const &sig2)
-{
+bool insufficient_overlap(unordered_map<displacement, int> const &sig1,
+                          unordered_map<displacement, int> const &sig2) {
   int num_overlaps = 0;
-  for (auto const &s2 : sig2)
-    if (sig1.find(s2) != sig1.end())
-      ++num_overlaps;
-  // A set of 12 matching probes is the minimum.  The signature will
+  for (auto const &[disp, cnt2] : sig2)
+    if (auto p = sig1.find(disp); p != sig1.end())
+      num_overlaps += min(p->second, cnt2);
+  // A set of 12 matching beacons is the minimum.  The signature will
   // contain displacements between each of those 12 with one of the 11
   // others, but pairs are canonically ordered so / 2.
   return num_overlaps < 12 * 11 / 2;
@@ -153,41 +179,65 @@ bool region::merge(region const &r) {
       continue;
     for (auto const &d : sensed)
       for (auto const &d1 : r1.sensed) {
-	// Try shifting d1 on top of d and see if we get a match
-	displacement shift = d - d1;
-	region r2(r1, shift);
-	int num_overlaps = 0;
-	for (auto const &d2 : r2.sensed)
-	  if (sensed.find(d2) != sensed.end())
-	    ++num_overlaps;
-	if (num_overlaps >= 12) {
-	  sensed.insert(r2.sensed.begin(), r2.sensed.end());
-	  return true;
-	}
+        // Try shifting d1 on top of d and see if we get a match
+        displacement shift = d - d1;
+        region r2(r1, shift);
+        int num_overlaps = 0;
+        for (auto const &d2 : r2.sensed)
+          if (sensed.contains(d2))
+            ++num_overlaps;
+        if (num_overlaps >= 12) {
+          sensed.insert(r2.sensed.begin(), r2.sensed.end());
+          scanners.insert(scanners.end(), r2.scanners.begin(),
+                          r2.scanners.end());
+          return true;
+        }
       }
   }
   return false;
 }
 
-int main(int argc, char **argv) {
+void solve(bool part1) {
   list<region> regions;
   string line;
   while (getline(cin, line)) {
-    int scanner_num = stoi(line);
+    string dash, scanner;
+    int scanner_num;
+    stringstream(line) >> dash >> scanner >> scanner_num >> dash;
+    assert(dash == "---");
     assert(scanner_num == int(regions.size()));
-    regions.push_back(region(cin));
+    regions.push_back(region());
   }
-  while (regions.size() > 1) {
-    auto i = regions.begin();
-    ++i;
-    while (i != regions.end()) {
+  while (regions.size() > 1)
+    for (auto i = next(regions.begin()); i != regions.end();)
       if (regions.begin()->merge(*i))
-	regions.erase(i++);
+        regions.erase(i++);
       else
-	++i;
-    }
-  }
+        ++i;
   assert(!regions.empty());
-  printf("%zu probes\n", regions.begin()->sensed.size());
+  region const &r = *regions.begin();
+  if (part1)
+    cout << r.sensed.size() << '\n';
+  else {
+    int max_manhattan = 0;
+    for (auto const &d1 : r.scanners)
+      for (auto const &d2 : r.scanners)
+        max_manhattan = max(max_manhattan, manhattan(d1, d2));
+    cout << max_manhattan << '\n';
+  }
+}
+
+void part1() { solve(true); }
+void part2() { solve(false); }
+
+int main(int argc, char **argv) {
+  if (argc != 2) {
+    cerr << "usage: " << argv[0] << " partnum < input\n";
+    exit(1);
+  }
+  if (*argv[1] == '1')
+    part1();
+  else
+    part2();
   return 0;
 }
