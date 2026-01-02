@@ -1,22 +1,33 @@
+// -*- C++ -*-
+// g++ -std=c++20 -Wall -g -o doit doit.cc
+// ./doit 1 < input  # part 1
+// ./doit 2 < input  # part 2
+
 #include <iostream>
 #include <string>
 #include <array>
+#include <vector>
 #include <list>
+#include <set>
 #include <map>
-#include <stdio.h>
-#include <assert.h>
+#include <cassert>
 
 using namespace std;
 
+// Extra lines for part 2
+string extra[2] = {"#D#C#B#A#", "#D#B#A#C#"};
+
+// The state of the burrow
 struct burrow {
   // ..x.x.x.x..
   // x = forbidden outside-of-room space, but it's convenient to have
   // an index for those even though they can't be used
   array<char, 11> hallway;
-  // 4 rooms, each two spots, top spot is index 0
-  array<array<char, 2>, 4> rooms;
+  // 4 rooms, variable depth, top spot is index 0
+  array<vector<char>, 4> rooms;
 
-  burrow(istream &in);
+  // Construct initial state from cin
+  burrow(bool part2);
 
   bool is_clear(char c) const { return c == '.'; }
   bool is_amphipod(char c) const { return c >= 'A' && c <= 'D'; }
@@ -45,31 +56,35 @@ struct burrow {
 
   // Everyone in their room?
   bool all_home() const;
-
-  void print() const;
 };
 
-burrow::burrow(istream &in) {
+burrow::burrow(bool part2) {
   string line;
-  in >> line;
+  cin >> line;
   assert(line == string(hallway.size() + 2, '#'));
-  in >> line;
+  cin >> line;
   assert(line.size() == hallway.size() + 2);
   line = line.substr(1);
   for (auto &c : hallway) {
     c = line[0];
     line = line.substr(1);
   }
-  for (unsigned i = 0; i < rooms[0].size(); ++i) {
-    in >> line;
+  vector<string> lines;
+  while (cin >> line)
+    lines.push_back(line);
+  assert(lines.size() == 3);
+  if (part2)
+    lines = {lines[0], extra[0], extra[1], lines[1], lines[2]};
+  // Read room rows until we hit the bottom
+  for (auto line : lines) {
     while (!line.empty() && line[0] == '#')
       line = line.substr(1);
+    if (line.empty() || line[0] == '#')
+      break;
     assert(line.size() >= 2 * rooms.size());
     for (unsigned r = 0; r < rooms.size(); ++r)
-      rooms[r][i] = line[2 * r];
+      rooms[r].push_back(line[2 * r]);
   }
-  in >> line;
-  assert(line == string(line.size(), '#'));
 }
 
 unsigned burrow::move_cost(char amphipod) const {
@@ -119,21 +134,21 @@ list<pair<burrow, unsigned>> burrow::move_out() const {
     unsigned hall_pos = outside_door(r);
     assert(is_clear(hallway[hall_pos]));
     // Walk left or right
-    for (int dir : { -1, +1 }) {
+    for (int dir : {-1, +1}) {
       int h = hall_pos + dir;
       unsigned s = steps + 1;
       while (h >= 0 && h < int(hallway.size())) {
-	if (!is_clear(hallway[h]))
-	  // Someone is in the way
-	  break;
-	if (!is_forbidden(h)) {
-	  burrow next(*this);
-	  next.rooms[r][i] = '.';
-	  next.hallway[h] = amphipod;
-	  result.emplace_back(next, s * move_cost(amphipod));
-	}
-	h += dir;
-	++s;
+        if (!is_clear(hallway[h]))
+          // Someone is in the way
+          break;
+        if (!is_forbidden(h)) {
+          burrow next(*this);
+          next.rooms[r][i] = '.';
+          next.hallway[h] = amphipod;
+          result.emplace_back(next, s * move_cost(amphipod));
+        }
+        h += dir;
+        ++s;
       }
     }
   }
@@ -199,77 +214,58 @@ bool burrow::all_home() const {
   return true;
 }
 
-void burrow::print() const {
-  printf(" #############\n");
-  printf(" #");
-  for (unsigned i = 0; i < hallway.size(); ++i)
-    fputc(hallway[i], stdout);
-  printf("#\n");
-  printf(" ###%c#%c#%c#%c###\n",
-	 rooms[0][0], rooms[1][0], rooms[2][0], rooms[3][0]);
-  for (unsigned i = 1; i < rooms[0].size(); ++i)
-    printf("   #%c#%c#%c#%c#\n",
-	   rooms[0][i], rooms[1][i], rooms[2][i], rooms[3][i]);
-  printf("   #########\n\n");
-}
-
 // Some random total order
 bool operator<(burrow const &b1, burrow const &b2) {
-  if (b1.hallway < b2.hallway)
-    return true;
-  if (b2.hallway < b1.hallway)
-    return false;
+  if (b1.hallway != b2.hallway)
+    return b1.hallway < b2.hallway;
   return b1.rooms < b2.rooms;
 }
 
-pair<unsigned, list<burrow>> search(burrow const &start) {
-  // Things to explore
-  multimap<unsigned, list<burrow>> to_search;
-  to_search.emplace(0, list<burrow>(1, start));
-  // Pointers from final burrow state to the corresponding entry in
-  // to_search
-  map<burrow, decltype(to_search)::iterator> path_to;
-  path_to[start] = to_search.begin();
+unsigned search(burrow const &start) {
+  // States to explore, sorted by cost
+  set<pair<unsigned, burrow>> to_search;
+  to_search.emplace(0, start);
+  // Best cost to reach each state
+  map<burrow, unsigned> best_cost;
+  best_cost[start] = 0;
   // Search from minimum cost
   while (!to_search.empty()) {
-    auto cb = *to_search.begin();
-    unsigned cost = cb.first;
-    list<burrow> const &bs = cb.second;
-    burrow const &b = bs.back();
-    // Remove from path_to
-    auto pt = path_to.find(b);
-    assert(pt != path_to.end() && pt->second == to_search.begin());
-    path_to.erase(pt);
+    auto [cost, b] = *to_search.begin();
     to_search.erase(to_search.begin());
+    // Skip if we've found a better path
+    if (auto it = best_cost.find(b); it != best_cost.end() && it->second < cost)
+      continue;
     // Done?
     if (b.all_home())
-      return cb;
-    for (auto const &next : b.successors()) {
-      unsigned next_cost = cost + next.second;
-      auto pt = path_to.find(next.first);
-      if (pt != path_to.end()) {
-	if (pt->second->first <= next_cost)
-	  // Already reached this state via a path that's at least as
-	  // good
-	  continue;
-	// Existing solution is worse, drop it
-	to_search.erase(pt->second);
-	path_to.erase(pt);
+      return cost;
+    for (auto const &[next, move_cost] : b.successors()) {
+      unsigned next_cost = cost + move_cost;
+      auto it = best_cost.find(next);
+      if (it == best_cost.end() || next_cost < it->second) {
+        best_cost[next] = next_cost;
+        to_search.emplace(next_cost, next);
       }
-      auto next_bs(bs);
-      next_bs.push_back(next.first);
-      path_to[next.first] = to_search.emplace(next_cost, next_bs);
     }
   }
   assert(false && "no solution found");
 }
 
+void solve(bool part2) {
+  burrow b(part2);
+  cout << search(b) << '\n';
+}
+
+void part1() { solve(false); }
+void part2() { solve(true); }
+
 int main(int argc, char **argv) {
-  burrow b(cin);
-  auto cost_and_steps = search(b);
-  if (argc > 1)
-    for (auto const &step : cost_and_steps.second)
-      step.print();
-  printf("Cost %u\n", cost_and_steps.first);
+  if (argc != 2) {
+    cerr << "usage: " << argv[0] << " partnum < input\n";
+    exit(1);
+  }
+  if (*argv[1] == '1')
+    part1();
+  else
+    part2();
   return 0;
 }
